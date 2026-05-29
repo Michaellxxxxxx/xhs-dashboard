@@ -620,8 +620,8 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<div style="width:200px;min-width:200px;flex-shrink:0;align-self:stretch;">
-         <img src="${trend.cover_url}" alt="封面" style="width:100%;height:100%;object-fit:cover;border-radius:8px;"
+    ? `<div style="width:200px;min-width:200px;flex-shrink:0;overflow-y:auto;border-radius:8px;">
+         <img src="${trend.cover_url}" alt="封面" style="width:100%;height:auto;display:block;border-radius:8px;"
               onerror="this.style.display='none'">
        </div>`
     : '';
