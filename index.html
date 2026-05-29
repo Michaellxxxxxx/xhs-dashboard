@@ -816,10 +816,10 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<div style="flex:0 0 380px;max-width:420px;background:#0d1117;border:1px solid #30363d;border-radius:10px;">
-         <img src="${trend.cover_url}" alt="封面" style="width:100%;height:auto;display:block;border-radius:10px 10px 0 0;"
+    ? `<div style="flex:0 0 380px;max-width:420px;max-height:calc(100vh - 240px);background:#0d1117;border:1px solid #30363d;border-radius:10px;display:flex;flex-direction:column;">
+         <img src="${trend.cover_url}" alt="封面" style="width:100%;height:100%;object-fit:contain;display:block;border-radius:10px 10px 0 0;"
               onerror="this.style.display='none'">
-         <div style="padding:8px 12px;font-size:11px;color:#8b949e;">📷 封面图</div>
+         <div style="padding:8px 12px;font-size:11px;color:#8b949e;flex-shrink:0;">📷 封面图</div>
        </div>`
     : '';
 
@@ -844,7 +844,7 @@ function showTrend(noteId, title) {
       ${coverImg}
 
       <!-- RIGHT: Info Card -->
-      <div style="flex:1;overflow-y:auto;min-width:0;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:20px;height:100vh;max-height:calc(100vh - 240px);">
+      <div style="flex:1;overflow-y:auto;min-width:0;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:20px;max-height:calc(100vh - 240px);">
 
         <!-- Title & Author -->
         <div style="font-size:18px;font-weight:600;color:#e1e4e8;margin-bottom:6px;line-height:1.4;">
