@@ -738,18 +738,17 @@ function renderTrendPosts() {
     else if (rankNow === 2) rankClass = 'rank-2';
     else if (rankNow === 3) rankClass = 'rank-3';
 
-    const dropBadge = dropped ? ' <span style="font-size:10px;background:#f85149;color:#fff;padding:1px 5px;border-radius:3px;vertical-align:middle;">📉已出榜</span>' : '';
-
     const selected = selectedTrendPost === p.note_id ? ' selected' : '';
 
     return `<div class="post-card${selected}" onclick="showTrend('${escAttr(p.note_id, p.keyword)}', '${escAttr(p.title)}')" style="display:flex;gap:8px;align-items:flex-start;">
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:40px;">
-        <span class="rank-num ${rankClass}" style="font-weight:700;font-size:13px;min-width:20px;text-align:center;">${rankNow}</span>
-        <span style="font-size:11px;min-width:28px;text-align:left;">${deltaHtml}</span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:32px;line-height:1.2;">
+        <span class="rank-num ${rankClass}" style="font-weight:700;font-size:14px;text-align:center;">${rankNow}</span>
+        <span style="font-size:10px;text-align:center;">${deltaHtml}</span>
+        ${dropped ? '<span style="font-size:9px;background:#f85149;color:#fff;padding:1px 4px;border-radius:3px;text-align:center;">OUT</span>' : ''}
       </div>
       ${p.cover_url ? `<img src="${p.cover_url}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'" loading="lazy">` : ''}
       <div style="flex:1;min-width:0;">
-        <div class="pc-title">${escHtml(p.title)}${dropBadge}</div>
+        <div class="pc-title" style="overflow-x:auto;white-space:nowrap;" onwheel="event.stopPropagation()">${escHtml(p.title)}</div>
         <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
         <div class="pc-metrics">
           <span>❤️ ${formatNum(latest?.likes || 0)}</span>
@@ -786,7 +785,7 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<div style="flex:1;min-width:300px;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:10px;">
+    ? `<div style="flex:0 0 380px;max-width:420px;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:10px;">
          <img src="${trend.cover_url}" alt="封面" style="width:100%;height:auto;display:block;border-radius:10px 10px 0 0;"
               onerror="this.style.display='none'">
          <div style="padding:8px 12px;font-size:11px;color:#8b949e;">📷 封面图</div>
