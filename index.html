@@ -620,8 +620,10 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<img src="${trend.cover_url}" alt="封面" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px 8px 0 0;"
-         onerror="this.style.display='none'">`
+    ? `<div style="width:200px;min-width:200px;flex-shrink:0;align-self:stretch;">
+         <img src="${trend.cover_url}" alt="封面" style="width:100%;height:100%;object-fit:cover;border-radius:8px;"
+              onerror="this.style.display='none'">
+       </div>`
     : '';
 
   // Compute metric deltas (latest vs first)
@@ -639,11 +641,13 @@ function showTrend(noteId, title) {
   }
 
   panel.innerHTML = `
-    <div style="padding:20px;overflow-y:auto;height:100%;">
-      <!-- Cover Image Card -->
+    <div style="display:flex;gap:0;height:100%;overflow:hidden;">
+
+      <!-- LEFT: Cover Image -->
       ${coverImg}
 
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:${trend.cover_url ? '0 0 8px 8px' : '8px'};padding:20px;${trend.cover_url ? 'border-top:none;' : ''}">
+      <!-- RIGHT: Info + Chart -->
+      <div style="flex:1;overflow-y:auto;padding:20px;min-width:0;">
 
         <!-- Title & Author -->
         <div style="font-size:18px;font-weight:600;color:#e1e4e8;margin-bottom:6px;line-height:1.4;">
