@@ -259,12 +259,12 @@ tr.dropped:hover { opacity: 0.7; }
     </div>
     <div class="control-group">
       <label>排序：</label>
-      <select id="sortSelect" onchange="renderRanking()">
-        <option value="likes">点赞数</option>
-        <option value="collects">收藏数</option>
-        <option value="comments">评论数</option>
-        <option value="composite">综合分</option>
-      </select>
+      <span id="sortButtons" style="display:inline-flex;gap:4px;">
+        <button class="sort-btn active" data-sort="likes" onclick="setSort('likes')">❤️ 点赞</button>
+        <button class="sort-btn" data-sort="collects" onclick="setSort('collects')">☆ 收藏</button>
+        <button class="sort-btn" data-sort="comments" onclick="setSort('comments')">💬 评论</button>
+        <button class="sort-btn" data-sort="composite" onclick="setSort('composite')">📊 综合</button>
+      </span>
     </div>
     <div class="control-group">
       <label>日期：</label>
