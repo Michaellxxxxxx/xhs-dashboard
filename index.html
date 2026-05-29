@@ -620,18 +620,80 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<img src="${trend.cover_url}" alt="封面" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:8px;margin-bottom:16px;"
+    ? `<img src="${trend.cover_url}" alt="封面" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px 8px 0 0;"
          onerror="this.style.display='none'">`
     : '';
 
+  // Compute metric deltas (latest vs first)
+  const latest = trend.data[trend.data.length - 1];
+  const first = trend.data[0];
+  const likeDelta = (latest && first) ? latest.likes - first.likes : 0;
+  const collectDelta = (latest && first) ? latest.collects - first.collects : 0;
+  const commentDelta = (latest && first) ? latest.comments - first.comments : 0;
+
+  function deltaBadge(v) {
+    if (v === 0) return '';
+    const sign = v > 0 ? '+' : '';
+    const clr = v > 0 ? '#3fb950' : '#f85149';
+    return `<span style="font-size:12px;color:${clr};margin-left:4px;">${sign}${formatNum(v)}</span>`;
+  }
+
   panel.innerHTML = `
-    <div class="trend-panel" style="padding:24px;">
+    <div style="padding:20px;overflow-y:auto;height:100%;">
+      <!-- Cover Image Card -->
       ${coverImg}
-      <div class="trend-title" style="font-size:20px;margin-bottom:8px;">${escHtml(trend.title)}</div>
-      <div class="trend-meta" style="margin-bottom:8px;">${escHtml(trend.author)} · ${trend.keyword} · ${trend.data.length} 个数据点</div>
-      ${trend.link ? `<div style="margin-bottom:20px"><a href="${trend.link}" target="_blank" rel="noopener" style="color:#58a6ff;font-size:13px;text-decoration:none;">🔗 查看原帖 →</a></div>` : ''}
-      <div class="chart-container" style="height:400px;">
-        <canvas id="trendChart"></canvas>
+
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:${trend.cover_url ? '0 0 8px 8px' : '8px'};padding:20px;${trend.cover_url ? 'border-top:none;' : ''}">
+
+        <!-- Title & Author -->
+        <div style="font-size:18px;font-weight:600;color:#e1e4e8;margin-bottom:6px;line-height:1.4;">
+          ${escHtml(trend.title)}
+        </div>
+        <div style="font-size:13px;color:#8b949e;margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;">
+          <span>👤 ${escHtml(trend.author)}</span>
+          <span>🏷️ ${escHtml(trend.keyword)}</span>
+          <span>📅 ${trend.data.length} 天数据</span>
+        </div>
+
+        <!-- Metric Cards Row -->
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <div style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center;">
+            <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">❤️ 点赞</div>
+            <div style="font-size:22px;font-weight:700;color:#e1e4e8;">${formatNum(latest?.likes || 0)}</div>
+            <div>${deltaBadge(likeDelta)}</div>
+          </div>
+          <div style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center;">
+            <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">☆ 收藏</div>
+            <div style="font-size:22px;font-weight:700;color:#e1e4e8;">${formatNum(latest?.collects || 0)}</div>
+            <div>${deltaBadge(collectDelta)}</div>
+          </div>
+          <div style="flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center;">
+            <div style="font-size:11px;color:#8b949e;margin-bottom:4px;">💬 评论</div>
+            <div style="font-size:22px;font-weight:700;color:#e1e4e8;">${formatNum(latest?.comments || 0)}</div>
+            <div>${deltaBadge(commentDelta)}</div>
+          </div>
+        </div>
+
+        <!-- Content Preview -->
+        ${trend.content ? `
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:16px;">
+          <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">📝 正文</div>
+          <div style="font-size:13px;color:#c9d1d9;line-height:1.6;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;">
+            ${escHtml(trend.content)}
+          </div>
+        </div>` : ''}
+
+        <!-- Link -->
+        ${trend.link ? `
+        <a href="${trend.link}" target="_blank" rel="noopener"
+           style="display:inline-block;padding:8px 16px;background:#1f3a5f;color:#58a6ff;border-radius:6px;font-size:13px;text-decoration:none;margin-bottom:16px;">
+          🔗 查看原帖 →
+        </a>` : ''}
+
+        <!-- Chart -->
+        <div style="height:320px;">
+          <canvas id="trendChart"></canvas>
+        </div>
       </div>
     </div>
   `;
