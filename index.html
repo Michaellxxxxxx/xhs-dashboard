@@ -558,6 +558,21 @@ function renderTrendPosts() {
     posts.push({ note_id: noteId, ...trend });
   }
 
+  // Build set of note_ids currently in ranking (latest date) per keyword
+  const inRanking = new Set();
+  if (DATA.dates.length) {
+    const latestDate = DATA.dates[DATA.dates.length - 1];
+    for (const [rkw, dates] of Object.entries(DATA.rankings || {})) {
+      if (kw && rkw !== kw) continue;
+      const dayData = dates[latestDate];
+      if (dayData) {
+        for (const entry of dayData) {
+          if (!entry.is_dropped) inRanking.add(entry.note_id);
+        }
+      }
+    }
+  }
+
   // Sort by latest likes descending
   posts.sort((a, b) => {
     const aLikes = a.data.length ? a.data[a.data.length - 1].likes : 0;
@@ -577,13 +592,15 @@ function renderTrendPosts() {
     const first = p.data[0];
     const likeDelta = latest && first ? latest.likes - first.likes : 0;
     const deltaStr = likeDelta >= 0 ? `+${formatNum(likeDelta)}` : formatNum(likeDelta);
+    const dropped = inRanking.size > 0 && !inRanking.has(p.note_id);
+    const dropBadge = dropped ? ' <span style="font-size:10px;background:#f85149;color:#fff;padding:1px 5px;border-radius:3px;vertical-align:middle;">📉已出榜</span>' : '';
 
     const selected = selectedTrendPost === p.note_id ? ' selected' : '';
 
     return `<div class="post-card${selected}" onclick="showTrend('${escAttr(p.note_id, p.keyword)}', '${escAttr(p.title)}')" style="display:flex;gap:10px;align-items:flex-start;">
       ${p.cover_url ? `<img src="${p.cover_url}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" loading="lazy">` : ''}
       <div style="flex:1;min-width:0;">
-        <div class="pc-title">${escHtml(p.title)}</div>
+        <div class="pc-title">${escHtml(p.title)}${dropBadge}</div>
         <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
         <div class="pc-metrics">
           <span>❤️ ${formatNum(latest?.likes || 0)} <small style="color:${likeDelta >= 0 ? '#3fb950' : '#f85149'}">${deltaStr}</small></span>
