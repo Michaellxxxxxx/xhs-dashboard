@@ -239,7 +239,18 @@ tr.dropped:hover { opacity: 0.7; }
 .post-card:hover { border-color: #f78166; background: #1c2128; }
 .post-card.selected { border-color: #f78166; background: #1c2128; }
 .post-card .pc-title { font-size: 14px; font-weight: 500; margin-bottom: 4px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  overflow: hidden; white-space: nowrap; }
+.post-card .pc-title-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+.post-card .pc-title-text.marquee {
+  animation: title-marquee 4s ease-in-out infinite alternate;
+}
+@keyframes title-marquee {
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(var(--marquee-offset, -100%)); }
+}
 .post-card .pc-meta { font-size: 12px; color: #8b949e; }
 .post-card .pc-metrics { margin-top: 6px; display: flex; gap: 12px; font-size: 12px; }
 
@@ -756,7 +767,7 @@ function renderTrendPosts() {
       </div>
       ${p.cover_url ? `<img src="${p.cover_url}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'" loading="lazy">` : ''}
       <div style="flex:1;min-width:0;">
-        <div class="pc-title" style="overflow-x:auto;white-space:nowrap;" onwheel="event.stopPropagation()">${escHtml(p.title)}</div>
+        <div class="pc-title"><span class="pc-title-text">${escHtml(p.title)}</span></div>
         <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
         <div class="pc-metrics">
           <span>❤️ ${formatNum(latest?.likes || 0)}</span>
@@ -766,6 +777,18 @@ function renderTrendPosts() {
       </div>
     </div>`;
   }).join('');
+
+  // Enable marquee for overflowing titles
+  requestAnimationFrame(() => {
+    grid.querySelectorAll('.pc-title').forEach(el => {
+      const span = el.querySelector('.pc-title-text');
+      if (span && span.scrollWidth > el.clientWidth) {
+        const offset = el.clientWidth - span.scrollWidth - 12; // 12px padding
+        span.style.setProperty('--marquee-offset', offset + 'px');
+        span.classList.add('marquee');
+      }
+    });
+  });
 }
 
 function showTrendFromRanking(noteId, title, kw) {
