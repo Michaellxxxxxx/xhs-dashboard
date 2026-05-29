@@ -524,13 +524,16 @@ function renderTrendPosts() {
 
     const selected = selectedTrendPost === p.note_id ? ' selected' : '';
 
-    return `<div class="post-card${selected}" onclick="showTrend('${escAttr(p.note_id, p.keyword)}', '${escAttr(p.title)}')">
-      <div class="pc-title">${escHtml(p.title)}</div>
-      <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
-      <div class="pc-metrics">
-        <span>❤️ ${formatNum(latest?.likes || 0)} <small style="color:${likeDelta >= 0 ? '#3fb950' : '#f85149'}">${deltaStr}</small></span>
-        <span>☆ ${formatNum(latest?.collects || 0)}</span>
-        <span>💬 ${formatNum(latest?.comments || 0)}</span>
+    return `<div class="post-card${selected}" onclick="showTrend('${escAttr(p.note_id, p.keyword)}', '${escAttr(p.title)}')" style="display:flex;gap:10px;align-items:flex-start;">
+      ${p.cover_url ? `<img src="${p.cover_url}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" loading="lazy">` : ''}
+      <div style="flex:1;min-width:0;">
+        <div class="pc-title">${escHtml(p.title)}</div>
+        <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
+        <div class="pc-metrics">
+          <span>❤️ ${formatNum(latest?.likes || 0)} <small style="color:${likeDelta >= 0 ? '#3fb950' : '#f85149'}">${deltaStr}</small></span>
+          <span>☆ ${formatNum(latest?.collects || 0)}</span>
+          <span>💬 ${formatNum(latest?.comments || 0)}</span>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -554,10 +557,16 @@ function showTrend(noteId, title) {
   if (!trend) return;
 
   const panel = document.getElementById('trendPanel');
+  const coverImg = trend.cover_url
+    ? `<img src="${trend.cover_url}" alt="封面" style="width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0;"
+         onerror="this.style.display='none'">`
+    : '';
+
   panel.innerHTML = `
     <div class="trend-panel">
-      <div class="trend-header">
-        <div>
+      <div class="trend-header" style="display:flex;gap:16px;align-items:flex-start;">
+        ${coverImg}
+        <div style="flex:1;">
           <div class="trend-title">${escHtml(trend.title)}</div>
           <div class="trend-meta">${escHtml(trend.author)} · ${trend.keyword} · ${trend.data.length} 个数据点</div>
         </div>
