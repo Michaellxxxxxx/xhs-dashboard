@@ -637,7 +637,7 @@ function showTrend(noteId, title) {
 
   const panel = document.getElementById('trendPanel');
   const coverImg = trend.cover_url
-    ? `<div style="width:320px;min-width:320px;flex-shrink:0;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:10px;">
+    ? `<div style="flex:1;min-width:300px;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:10px;">
          <img src="${trend.cover_url}" alt="封面" style="width:100%;height:auto;display:block;border-radius:10px 10px 0 0;"
               onerror="this.style.display='none'">
          <div style="padding:8px 12px;font-size:11px;color:#8b949e;">📷 封面图</div>
