@@ -69,6 +69,27 @@ body {
   color: #8b949e;
   white-space: nowrap;
 }
+.sort-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #21262d;
+  color: #8b949e;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.sort-btn:hover {
+  border-color: #58a6ff;
+  color: #e1e4e8;
+}
+.sort-btn.active {
+  background: #1f3a5f;
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-weight: 600;
+}
 select {
   background: #21262d;
   color: #e1e4e8;
@@ -415,11 +436,22 @@ function switchTab(tab) {
 }
 
 // ===== RANKING =====
+let currentSort = 'likes';
+
+function setSort(sortBy) {
+  currentSort = sortBy;
+  // Update button active state
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sort === sortBy);
+  });
+  renderRanking();
+}
+
 function renderRanking() {
   if (!DATA) return;
 
   const kw = document.getElementById('kwSelect').value;
-  const sortBy = document.getElementById('sortSelect').value;
+  const sortBy = currentSort;
   const date = document.getElementById('dateSelect').value;
 
   if (!kw || !date) return;
