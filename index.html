@@ -569,6 +569,7 @@ function showTrend(noteId, title) {
         <div style="flex:1;">
           <div class="trend-title">${escHtml(trend.title)}</div>
           <div class="trend-meta">${escHtml(trend.author)} · ${trend.keyword} · ${trend.data.length} 个数据点</div>
+          ${trend.link ? `<div style="margin-top:4px"><a href="${trend.link}" target="_blank" rel="noopener" style="color:#58a6ff;font-size:12px;text-decoration:none;">🔗 查看原帖 →</a></div>` : ''}
         </div>
       </div>
       <div class="chart-container">
