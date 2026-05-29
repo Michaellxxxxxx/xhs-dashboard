@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小红书数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0f1117;
+  color: #e1e4e8;
+  min-height: 100vh;
+}
+.header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 { font-size: 18px; font-weight: 600; color: #f78166; }
+.header .update-time { font-size: 12px; color: #8b949e; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 0 24px;
+}
+.tab-btn {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.tab-btn:hover { color: #e1e4e8; }
+.tab-btn.active {
+  color: #f78166;
+  border-bottom-color: #f78166;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.control-group label {
+  font-size: 13px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+select {
+  background: #21262d;
+  color: #e1e4e8;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+select:focus { outline: none; border-color: #f78166; }
+
+/* Content */
+.content { padding: 16px 24px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Summary cards */
+.summary-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.summary-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  flex: 1;
+  min-width: 140px;
+}
+.summary-card .label { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+.summary-card .value { font-size: 24px; font-weight: 700; }
+.summary-card .value.up { color: #3fb950; }
+.summary-card .value.down { color: #f85149; }
+.summary-card .value.new { color: #58a6ff; }
+
+/* Table */
+.table-wrapper {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th {
+  background: #1c2128;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #8b949e;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #30363d;
+  white-space: nowrap;
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #21262d;
+  vertical-align: middle;
+}
+tr:hover td { background: #1c2128; }
+tr.dropped { opacity: 0.4; }
+tr.dropped:hover { opacity: 0.7; }
+
+.rank-cell { font-weight: 700; font-size: 14px; width: 48px; text-align: center; }
+.rank-1 { color: #f0c000; }
+.rank-2 { color: #c0c0c0; }
+.rank-3 { color: #cd7f32; }
+
+.title-cell { max-width: 300px; }
+.title-cell a {
+  color: #58a6ff;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.title-cell a:hover { text-decoration: underline; }
+.author-cell { color: #8b949e; font-size: 12px; white-space: nowrap; }
+
+.metric-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.metric-cell .num { font-weight: 600; }
+.metric-cell .delta { font-size: 11px; margin-left: 2px; }
+.delta-up { color: #3fb950; }
+.delta-down { color: #f85149; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-new { background: #1f3a5f; color: #58a6ff; }
+.badge-drop { background: #3d1f1f; color: #f85149; }
+.rank-arrow-up { color: #3fb950; }
+.rank-arrow-down { color: #f85149; }
+
+/* Trend section */
+.trend-panel {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 24px;
+  margin-top: 20px;
+}
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.trend-title { font-size: 18px; font-weight: 600; }
+.trend-meta { font-size: 13px; color: #8b949e; margin-top: 4px; }
+.chart-container { position: relative; height: 400px; }
+.trend-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  color: #484f58;
+}
+.trend-placeholder .icon { font-size: 48px; margin-bottom: 12px; }
+
+/* Post selector for trend tab */
+.post-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.post-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.post-card:hover { border-color: #f78166; background: #1c2128; }
+.post-card.selected { border-color: #f78166; background: #1c2128; }
+.post-card .pc-title { font-size: 14px; font-weight: 500; margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.post-card .pc-meta { font-size: 12px; color: #8b949e; }
+.post-card .pc-metrics { margin-top: 6px; display: flex; gap: 12px; font-size: 12px; }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #484f58;
+}
+
+.loading { text-align: center; padding: 40px; color: #8b949e; }
+.error { text-align: center; padding: 40px; color: #f85149; }
+
+@media (max-width: 768px) {
+  .controls { flex-direction: column; align-items: flex-start; }
+  th:nth-child(4), td:nth-child(4),
+  th:nth-child(5), td:nth-child(5) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📊 小红书数据看板</h1>
+  <span class="update-time" id="updateTime">加载中...</span>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('ranking')">🏆 排行榜</button>
+  <button class="tab-btn" onclick="switchTab('trends')">📈 帖子趋势</button>
+</div>
+
+<!-- RANKING TAB -->
+<div class="tab-content active" id="tab-ranking">
+  <div class="controls">
+    <div class="control-group">
+      <label>关键词：</label>
+      <select id="kwSelect" onchange="renderRanking()"></select>
+    </div>
+    <div class="control-group">
+      <label>排序：</label>
+      <select id="sortSelect" onchange="renderRanking()">
+        <option value="likes">点赞数</option>
+        <option value="collects">收藏数</option>
+        <option value="comments">评论数</option>
+        <option value="composite">综合分</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>日期：</label>
+      <select id="dateSelect" onchange="renderRanking()"></select>
+    </div>
+  </div>
+
+  <div class="summary-row" id="summaryCards"></div>
+
+  <div class="table-wrapper" id="rankTableWrapper">
+    <div class="loading">加载数据中...</div>
+  </div>
+</div>
+
+<!-- TRENDS TAB -->
+<div class="tab-content" id="tab-trends">
+  <div class="controls">
+    <div class="control-group">
+      <label>关键词：</label>
+      <select id="trendKwSelect" onchange="renderTrendPosts()"></select>
+    </div>
+    <div class="control-group">
+      <label>搜索：</label>
+      <input type="text" id="trendSearch" placeholder="标题/作者..."
+        style="background:#21262d;color:#e1e4e8;border:1px solid #30363d;
+        border-radius:6px;padding:6px 12px;font-size:13px;width:200px;"
+        oninput="renderTrendPosts()">
+    </div>
+  </div>
+
+  <div id="postGrid" class="post-list"></div>
+  <div id="trendPanel"></div>
+</div>
+
+<script>
+// ===== STATE =====
+let DATA = null;
+let selectedTrendPost = null;
+let trendChart = null;
+let currentTab = 'ranking';
+
+// ===== LOAD =====
+fetch('data.json')
+  .then(r => r.json())
+  .then(d => {
+    DATA = d;
+    init();
+  })
+  .catch(e => {
+    document.getElementById('rankTableWrapper').innerHTML =
+      '<div class="error">❌ 加载 data.json 失败: ' + e.message + '</div>';
+  });
+
+function init() {
+  document.getElementById('updateTime').textContent =
+    '更新于 ' + formatTime(DATA.updated_at);
+
+  // Populate keyword selectors
+  const kwSelect = document.getElementById('kwSelect');
+  const trendKwSelect = document.getElementById('trendKwSelect');
+
+  DATA.keywords.forEach(kw => {
+    kwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
+    trendKwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
+  });
+
+  // Populate date selector (reversed - newest first)
+  const dateSelect = document.getElementById('dateSelect');
+  [...DATA.dates].reverse().forEach(d => {
+    dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
+  });
+
+  renderRanking();
+  renderTrendPosts();
+}
+
+// ===== TAB SWITCH =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+  if (tab === 'ranking') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.getElementById('tab-ranking').classList.add('active');
+    renderRanking();
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    document.getElementById('tab-trends').classList.add('active');
+    renderTrendPosts();
+  }
+}
+
+// ===== RANKING =====
+function renderRanking() {
+  if (!DATA) return;
+
+  const kw = document.getElementById('kwSelect').value;
+  const sortBy = document.getElementById('sortSelect').value;
+  const date = document.getElementById('dateSelect').value;
+
+  if (!kw || !date) return;
+
+  const rankData = DATA.rankings[kw]?.[date] || [];
+
+  // Sort by selected metric
+  const sorted = [...rankData].filter(e => !e.is_dropped);
+  sorted.sort((a, b) => {
+    if (sortBy === 'composite') {
+      const scoreA = a.likes * 0.5 + a.collects * 0.3 + a.comments * 0.2;
+      const scoreB = b.likes * 0.5 + b.collects * 0.3 + b.comments * 0.2;
+      return scoreB - scoreA;
+    }
+    return b[sortBy] - a[sortBy];
+  });
+
+  const dropped = rankData.filter(e => e.is_dropped);
+  const activeCount = sorted.length;
+  const newCount = sorted.filter(e => e.is_new).length;
+  const dropCount = dropped.length;
+
+  // Summary cards
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="summary-card">
+      <div class="label">上榜帖子</div>
+      <div class="value">${activeCount}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">🆕 新上榜</div>
+      <div class="value new">${newCount}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">📉 出榜</div>
+      <div class="value down">${dropCount}</div>
+    </div>
+  `;
+
+  // Build table
+  let html = `<table>
+    <thead><tr>
+      <th>#</th>
+      <th>变动</th>
+      <th>标题</th>
+      <th>作者</th>
+      <th>❤️ 点赞</th>
+      <th>☆ 收藏</th>
+      <th>💬 评论</th>
+    </tr></thead><tbody>`;
+
+  if (sorted.length === 0) {
+    html += `<tr><td colspan="7" class="empty-state">暂无数据</td></tr>`;
+  }
+
+  sorted.forEach((entry, idx) => {
+    const rank = idx + 1;
+    const rankClass = rank <= 3 ? `rank-${rank}` : '';
+
+    // Delta indicators
+    let deltaHtml = '';
+    if (entry.is_new) {
+      deltaHtml = '<span class="badge badge-new">NEW</span>';
+    } else if (entry.delta_rank !== null) {
+      if (entry.delta_rank > 0) {
+        deltaHtml = `<span class="rank-arrow-up">▲${entry.delta_rank}</span>`;
+      } else if (entry.delta_rank < 0) {
+        deltaHtml = `<span class="rank-arrow-down">▼${Math.abs(entry.delta_rank)}</span>`;
+      } else {
+        deltaHtml = '<span style="color:#8b949e">─</span>';
+      }
+    }
+
+    // Metric deltas
+    const likeDelta = entry.delta_likes
+      ? ` <span class="delta ${entry.delta_likes > 0 ? 'delta-up' : 'delta-down'}">${entry.delta_likes > 0 ? '+' : ''}${formatNum(entry.delta_likes)}</span>`
+      : '';
+    const collectDelta = entry.delta_collects
+      ? ` <span class="delta ${entry.delta_collects > 0 ? 'delta-up' : 'delta-down'}">${entry.delta_collects > 0 ? '+' : ''}${formatNum(entry.delta_collects)}</span>`
+      : '';
+    const commentDelta = entry.delta_comments
+      ? ` <span class="delta ${entry.delta_comments > 0 ? 'delta-up' : 'delta-down'}">${entry.delta_comments > 0 ? '+' : ''}${formatNum(entry.delta_comments)}</span>`
+      : '';
+
+    html += `<tr>
+      <td class="rank-cell ${rankClass}">${rank}</td>
+      <td>${deltaHtml}</td>
+      <td class="title-cell">
+        <a onclick="showTrendFromRanking('${escHtml(entry.note_id)}', '${escAttr(entry.title)}', '${escAttr(kw)}')">${escHtml(entry.title)}</a>
+      </td>
+      <td class="author-cell">${escHtml(entry.author)}</td>
+      <td class="metric-cell"><span class="num">${formatNum(entry.likes)}</span>${likeDelta}</td>
+      <td class="metric-cell"><span class="num">${formatNum(entry.collects)}</span>${collectDelta}</td>
+      <td class="metric-cell"><span class="num">${formatNum(entry.comments)}</span>${commentDelta}</td>
+    </tr>`;
+  });
+
+  // Dropped entries
+  if (dropped.length > 0) {
+    html += `<tr><td colspan="7" style="padding:8px 14px;color:#8b949e;font-size:12px;">
+      ⚠️ 出榜帖子 (${dropped.length}条)
+    </td></tr>`;
+    dropped.forEach(entry => {
+      html += `<tr class="dropped">
+        <td class="rank-cell">─</td>
+        <td><span class="badge badge-drop">OUT</span></td>
+        <td class="title-cell">
+          <a onclick="showTrendFromRanking('${escHtml(entry.note_id)}', '${escAttr(entry.title)}', '${escAttr(kw)}')">${escHtml(entry.title)}</a>
+        </td>
+        <td class="author-cell">${escHtml(entry.author)}</td>
+        <td class="metric-cell"><span class="num">${formatNum(entry.likes)}</span></td>
+        <td class="metric-cell"><span class="num">${formatNum(entry.collects)}</span></td>
+        <td class="metric-cell"><span class="num">${formatNum(entry.comments)}</span></td>
+      </tr>`;
+    });
+  }
+
+  html += '</tbody></table>';
+  document.getElementById('rankTableWrapper').innerHTML = html;
+}
+
+// ===== TRENDS =====
+function renderTrendPosts() {
+  if (!DATA) return;
+
+  const kw = document.getElementById('trendKwSelect').value;
+  const search = (document.getElementById('trendSearch').value || '').toLowerCase();
+
+  // Get all posts for this keyword
+  const posts = [];
+  for (const [noteId, trend] of Object.entries(DATA.trends)) {
+    if (kw && trend.keyword !== kw) continue;
+    if (search) {
+      if (!trend.title.toLowerCase().includes(search) &&
+          !trend.author.toLowerCase().includes(search)) continue;
+    }
+    posts.push({ note_id: noteId, ...trend });
+  }
+
+  // Sort by latest likes descending
+  posts.sort((a, b) => {
+    const aLikes = a.data.length ? a.data[a.data.length - 1].likes : 0;
+    const bLikes = b.data.length ? b.data[b.data.length - 1].likes : 0;
+    return bLikes - aLikes;
+  });
+
+  const grid = document.getElementById('postGrid');
+
+  if (posts.length === 0) {
+    grid.innerHTML = '<div class="empty-state">没有匹配的帖子</div>';
+    return;
+  }
+
+  grid.innerHTML = posts.map(p => {
+    const latest = p.data[p.data.length - 1];
+    const first = p.data[0];
+    const likeDelta = latest && first ? latest.likes - first.likes : 0;
+    const deltaStr = likeDelta >= 0 ? `+${formatNum(likeDelta)}` : formatNum(likeDelta);
+
+    const selected = selectedTrendPost === p.note_id ? ' selected' : '';
+
+    return `<div class="post-card${selected}" onclick="showTrend('${escAttr(p.note_id, p.keyword)}', '${escAttr(p.title)}')">
+      <div class="pc-title">${escHtml(p.title)}</div>
+      <div class="pc-meta">${escHtml(p.author)} · ${p.keyword} · ${p.data.length}天数据</div>
+      <div class="pc-metrics">
+        <span>❤️ ${formatNum(latest?.likes || 0)} <small style="color:${likeDelta >= 0 ? '#3fb950' : '#f85149'}">${deltaStr}</small></span>
+        <span>☆ ${formatNum(latest?.collects || 0)}</span>
+        <span>💬 ${formatNum(latest?.comments || 0)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showTrendFromRanking(noteId, title, kw) {
+  // Sync keyword from ranking tab to trends tab
+  const trendKwSelect = document.getElementById('trendKwSelect');
+  if (trendKwSelect && kw) {
+    trendKwSelect.value = kw;
+  }
+  showTrend(noteId, title);
+}
+
+function showTrend(noteId, title) {
+  selectedTrendPost = noteId;
+  switchTab('trends');
+  renderTrendPosts();
+
+  const trend = DATA.trends[noteId];
+  if (!trend) return;
+
+  const panel = document.getElementById('trendPanel');
+  panel.innerHTML = `
+    <div class="trend-panel">
+      <div class="trend-header">
+        <div>
+          <div class="trend-title">${escHtml(trend.title)}</div>
+          <div class="trend-meta">${escHtml(trend.author)} · ${trend.keyword} · ${trend.data.length} 个数据点</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+  `;
+
+  // Build chart
+  const dates = trend.data.map(d => d.date);
+  const likes = trend.data.map(d => d.likes);
+  const collects = trend.data.map(d => d.collects);
+  const comments = trend.data.map(d => d.comments);
+  const singlePoint = dates.length < 2;
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+
+  if (trendChart) trendChart.destroy();
+
+  function makeDataset(label, data, color) {
+    // For single data point: show as bar chart with big points
+    // For multiple: smooth line chart
+    if (singlePoint) {
+      return {
+        label, data,
+        backgroundColor: color.replace(')', ', 0.7)').replace('rgb', 'rgba'),
+        borderColor: color,
+        borderWidth: 0,
+        borderRadius: 6,
+        barPercentage: 0.6,
+      };
+    }
+    return {
+      label, data,
+      borderColor: color,
+      backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+      fill: true,
+      tension: 0.3,
+      pointRadius: 4,
+      pointBackgroundColor: color,
+    };
+  }
+
+  trendChart = new Chart(ctx, {
+    type: singlePoint ? 'bar' : 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        makeDataset('❤️ 点赞', likes, 'rgb(248, 81, 73)'),
+        makeDataset('☆ 收藏', collects, 'rgb(247, 129, 102)'),
+        makeDataset('💬 评论', comments, 'rgb(88, 166, 255)'),
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#8b949e', font: { size: 13 }, usePointStyle: true, padding: 20 }
+        },
+        tooltip: {
+          backgroundColor: '#21262d',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#e1e4e8',
+          bodyColor: '#e1e4e8',
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e' },
+          grid: { color: '#21262d' }
+        },
+        y: {
+          ticks: { color: '#8b949e', callback: v => formatNum(v) },
+          grid: { color: '#21262d' },
+          ...(singlePoint ? { beginAtZero: true } : {})
+        }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index',
+      }
+    }
+  });
+
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== UTILS =====
+function formatNum(n) {
+  if (n === null || n === undefined) return '0';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n.toLocaleString();
+}
+
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escAttr(s, kw) {
+  // Pass note_id as-is, but escape for JS string
+  return (s || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+</script>
+
+</body>
+</html>
