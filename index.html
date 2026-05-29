@@ -345,15 +345,21 @@ tr.dropped:hover { opacity: 0.7; }
       <select id="cmpKwSelect" onchange="renderCompare()"></select>
     </div>
     <div class="control-group">
+      <label>视图：</label>
+      <span id="cmpViewButtons" style="display:inline-flex;gap:4px;">
+        <button class="sort-btn active" data-view="trend" onclick="setCmpView('trend')">📈 趋势对比</button>
+        <button class="sort-btn" data-view="bar" onclick="setCmpView('bar')">📊 当日排名</button>
+      </span>
+    </div>
+    <div class="control-group" id="cmpMetricGroup">
       <label>指标：</label>
       <span id="cmpMetricButtons" style="display:inline-flex;gap:4px;">
         <button class="sort-btn active" data-metric="likes" onclick="setCmpMetric('likes')">❤️ 点赞</button>
         <button class="sort-btn" data-metric="collects" onclick="setCmpMetric('collects')">☆ 收藏</button>
         <button class="sort-btn" data-metric="comments" onclick="setCmpMetric('comments')">💬 评论</button>
-        <button class="sort-btn" data-metric="composite" onclick="setCmpMetric('composite')">📊 综合</button>
       </span>
     </div>
-    <div class="control-group">
+    <div class="control-group" id="cmpDateGroup">
       <label>日期：</label>
       <select id="cmpDateSelect" onchange="renderCompare()"></select>
     </div>
@@ -420,6 +426,7 @@ let trendChart = null;
 let cmpChart = null;
 let currentTab = 'ranking';
 let cmpMetric = 'likes';
+let cmpView = 'trend';
 
 // ===== LOAD =====
 fetch('data.json')
@@ -458,6 +465,7 @@ function init() {
 
   renderRanking();
   renderTrendPosts();
+  setCmpView('trend'); // init compare tab visibility
 }
 
 // ===== TAB SWITCH =====
@@ -950,6 +958,9 @@ function showTrend(noteId, title) {
 }
 
 // ===== COMPARE =====
+const PALETTE = ['#f78166','#58a6ff','#3fb950','#d2a854','#bc8cff','#ff7b72','#79c0ff','#7ee787',
+  '#e3b341','#d2a8ff','#ffa198','#a5d6ff','#56d364','#eac54f','#bea1ff'];
+
 function setCmpMetric(metric) {
   cmpMetric = metric;
   document.querySelectorAll('#cmpMetricButtons .sort-btn').forEach(b => b.classList.remove('active'));
@@ -957,7 +968,105 @@ function setCmpMetric(metric) {
   renderCompare();
 }
 
+function setCmpView(view) {
+  cmpView = view;
+  document.querySelectorAll('#cmpViewButtons .sort-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`#cmpViewButtons [data-view="${view}"]`).classList.add('active');
+  // Toggle controls visibility
+  document.getElementById('cmpMetricGroup').style.display = view === 'trend' ? '' : 'none';
+  document.getElementById('cmpDateGroup').style.display = view === 'bar' ? '' : 'none';
+  renderCompare();
+}
+
 function renderCompare() {
+  if (!DATA || currentTab !== 'compare') return;
+  if (cmpView === 'bar') return renderCompareBar();
+  return renderCompareTrend();
+}
+
+function renderCompareTrend() {
+  const kw = document.getElementById('cmpKwSelect').value;
+  if (!kw) return;
+
+  // Collect all posts for this keyword from trends
+  const posts = [];
+  for (const [nid, trend] of Object.entries(DATA.trends)) {
+    if (trend.keyword !== kw) continue;
+    if (trend.data.length < 2) continue; // need 2+ data points for a line
+    posts.push({ note_id: nid, ...trend });
+  }
+
+  // Sort by latest metric, take top 10
+  posts.sort((a,b) => {
+    const av = a.data.length ? a.data[a.data.length-1][cmpMetric] : 0;
+    const bv = b.data.length ? b.data[b.data.length-1][cmpMetric] : 0;
+    return bv - av;
+  });
+  const top = posts.slice(0, 10);
+
+  if (top.length === 0) return;
+
+  // Collect all dates across selected posts
+  const allDates = new Set();
+  top.forEach(p => p.data.forEach(d => allDates.add(d.date)));
+  const dates = [...allDates].sort();
+
+  const metricNames = { likes: '点赞', collects: '收藏', comments: '评论' };
+
+  const datasets = top.map((p, i) => {
+    const dateMap = {};
+    p.data.forEach(d => dateMap[d.date] = d[cmpMetric] || 0);
+    return {
+      label: p.title.length > 16 ? p.title.slice(0,14)+'…' : p.title,
+      data: dates.map(d => dateMap[d] || null),
+      borderColor: PALETTE[i % PALETTE.length],
+      backgroundColor: PALETTE[i % PALETTE.length] + '22',
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      spanGaps: false,
+    };
+  });
+
+  if (cmpChart) cmpChart.destroy();
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  cmpChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#8b949e', usePointStyle: true, padding: 16, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const val = ctx.raw !== null ? (ctx.raw >= 10000 ? (ctx.raw/10000).toFixed(1)+'万' : ctx.raw.toLocaleString()) : '—';
+              return `${ctx.dataset.label}: ${val}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+        y: {
+          ticks: {
+            color: '#8b949e',
+            callback: v => v >= 10000 ? (v/10000).toFixed(1)+'万' : v >= 1000 ? (v/1000).toFixed(1)+'k' : v
+          },
+          grid: { color: '#21262d' }
+        }
+      }
+    }
+  });
+}
+
+function renderCompareBar() {
   if (!DATA || currentTab !== 'compare') return;
 
   const kw = document.getElementById('cmpKwSelect').value;
@@ -970,27 +1079,14 @@ function renderCompare() {
   const entries = rankings[kw][date].filter(e => !e.is_dropped);
   if (entries.length === 0) return;
 
-  // Sort by selected metric
-  const sorted = [...entries].sort((a, b) => {
-    if (cmpMetric === 'composite') {
-      const ca = (a.likes||0) + (a.collects||0)*2 + (a.comments||0)*3;
-      const cb = (b.likes||0) + (b.collects||0)*2 + (b.comments||0)*3;
-      return cb - ca;
-    }
-    return (b[cmpMetric]||0) - (a[cmpMetric]||0);
-  });
-
-  // Top 20 for readability
-  const top = sorted.slice(0, 20).reverse(); // Chart.js draws bottom-up
+  const sorted = [...entries].sort((a, b) => (b[cmpMetric]||0) - (a[cmpMetric]||0));
+  const top = sorted.slice(0, 20).reverse();
 
   const labels = top.map(e => e.title.length > 18 ? e.title.slice(0,16)+'…' : e.title);
-  const values = top.map(e => {
-    if (cmpMetric === 'composite') return (e.likes||0) + (e.collects||0)*2 + (e.comments||0)*3;
-    return e[cmpMetric]||0;
-  });
+  const values = top.map(e => e[cmpMetric]||0);
 
-  const metricColors = { likes: '#f78166', collects: '#d2a854', comments: '#58a6ff', composite: '#7ee787' };
-  const metricNames = { likes: '点赞', collects: '收藏', comments: '评论', composite: '综合分' };
+  const metricColors = { likes: '#f78166', collects: '#d2a854', comments: '#58a6ff' };
+  const metricNames = { likes: '点赞', collects: '收藏', comments: '评论' };
 
   if (cmpChart) cmpChart.destroy();
 
@@ -1027,18 +1123,11 @@ function renderCompare() {
       },
       scales: {
         x: {
-          ticks: {
-            color: '#8b949e',
-            callback: v => v >= 10000 ? (v/10000).toFixed(1)+'万' : v >= 1000 ? (v/1000).toFixed(1)+'k' : v
-          },
+          ticks: { color: '#8b949e', callback: v => v >= 10000 ? (v/10000).toFixed(1)+'万' : v >= 1000 ? (v/1000).toFixed(1)+'k' : v },
           grid: { color: '#21262d' }
         },
         y: {
-          ticks: {
-            color: '#8b949e',
-            font: { size: 11 },
-            callback: (_, i) => `#${sorted.length - i}`
-          },
+          ticks: { color: '#8b949e', font: { size: 11 }, callback: (_, i) => `#${sorted.length - i}` },
           grid: { display: false }
         }
       }
