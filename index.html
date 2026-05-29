@@ -179,7 +179,7 @@ tr.dropped:hover { opacity: 0.7; }
 .title-cell a:hover { text-decoration: underline; }
 .author-cell { color: #8b949e; font-size: 12px; white-space: nowrap; }
 
-.metric-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.metric-cell { text-align: center; font-variant-numeric: tabular-nums; }
 .metric-cell .num { font-weight: 600; }
 .metric-cell .delta { font-size: 11px; margin-left: 2px; }
 .delta-up { color: #3fb950; }
@@ -497,9 +497,9 @@ function renderRanking() {
       <th>变动</th>
       <th>标题</th>
       <th>作者</th>
-      <th>❤️ 点赞</th>
-      <th>☆ 收藏</th>
-      <th>💬 评论</th>
+      <th style="text-align:center;">❤️ 点赞</th>
+      <th style="text-align:center;">☆ 收藏</th>
+      <th style="text-align:center;">💬 评论</th>
     </tr></thead><tbody>`;
 
   if (sorted.length === 0) {
