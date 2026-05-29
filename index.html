@@ -269,6 +269,7 @@ tr.dropped:hover { opacity: 0.7; }
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('ranking')">🏆 排行榜</button>
   <button class="tab-btn" onclick="switchTab('trends')">📈 帖子趋势</button>
+  <button class="tab-btn" onclick="switchTab('compare')">📊 数据对比</button>
 </div>
 
 <!-- RANKING TAB -->
@@ -336,6 +337,32 @@ tr.dropped:hover { opacity: 0.7; }
   </div>
 </div>
 
+<!-- COMPARE TAB -->
+<div class="tab-content" id="tab-compare">
+  <div class="controls">
+    <div class="control-group">
+      <label>关键词：</label>
+      <select id="cmpKwSelect" onchange="renderCompare()"></select>
+    </div>
+    <div class="control-group">
+      <label>指标：</label>
+      <span id="cmpMetricButtons" style="display:inline-flex;gap:4px;">
+        <button class="sort-btn active" data-metric="likes" onclick="setCmpMetric('likes')">❤️ 点赞</button>
+        <button class="sort-btn" data-metric="collects" onclick="setCmpMetric('collects')">☆ 收藏</button>
+        <button class="sort-btn" data-metric="comments" onclick="setCmpMetric('comments')">💬 评论</button>
+        <button class="sort-btn" data-metric="composite" onclick="setCmpMetric('composite')">📊 综合</button>
+      </span>
+    </div>
+    <div class="control-group">
+      <label>日期：</label>
+      <select id="cmpDateSelect" onchange="renderCompare()"></select>
+    </div>
+  </div>
+  <div style="padding:0 24px;">
+    <canvas id="compareChart" style="max-height:70vh;"></canvas>
+  </div>
+</div>
+
 <style>
 /* Split layout for trends tab */
 .split-layout {
@@ -390,7 +417,9 @@ tr.dropped:hover { opacity: 0.7; }
 let DATA = null;
 let selectedTrendPost = null;
 let trendChart = null;
+let cmpChart = null;
 let currentTab = 'ranking';
+let cmpMetric = 'likes';
 
 // ===== LOAD =====
 fetch('data.json')
@@ -411,16 +440,20 @@ function init() {
   // Populate keyword selectors
   const kwSelect = document.getElementById('kwSelect');
   const trendKwSelect = document.getElementById('trendKwSelect');
+  const cmpKwSelect = document.getElementById('cmpKwSelect');
 
   DATA.keywords.forEach(kw => {
     kwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
     trendKwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
+    cmpKwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
   });
 
   // Populate date selector (reversed - newest first)
   const dateSelect = document.getElementById('dateSelect');
+  const cmpDateSelect = document.getElementById('cmpDateSelect');
   [...DATA.dates].reverse().forEach(d => {
     dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
+    cmpDateSelect.innerHTML += `<option value="${d}">${d}</option>`;
   });
 
   renderRanking();
@@ -433,14 +466,19 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
+  const btns = document.querySelectorAll('.tab-btn');
   if (tab === 'ranking') {
-    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    btns[0].classList.add('active');
     document.getElementById('tab-ranking').classList.add('active');
     renderRanking();
-  } else {
-    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+  } else if (tab === 'trends') {
+    btns[1].classList.add('active');
     document.getElementById('tab-trends').classList.add('active');
     renderTrendPosts();
+  } else if (tab === 'compare') {
+    btns[2].classList.add('active');
+    document.getElementById('tab-compare').classList.add('active');
+    renderCompare();
   }
 }
 
@@ -910,6 +948,103 @@ function showTrend(noteId, title) {
     }
   });
 
+}
+
+// ===== COMPARE =====
+function setCmpMetric(metric) {
+  cmpMetric = metric;
+  document.querySelectorAll('#cmpMetricButtons .sort-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`#cmpMetricButtons [data-metric="${metric}"]`).classList.add('active');
+  renderCompare();
+}
+
+function renderCompare() {
+  if (!DATA || currentTab !== 'compare') return;
+
+  const kw = document.getElementById('cmpKwSelect').value;
+  const date = document.getElementById('cmpDateSelect').value;
+  if (!kw || !date) return;
+
+  const rankings = DATA.rankings;
+  if (!rankings[kw] || !rankings[kw][date]) return;
+
+  const entries = rankings[kw][date].filter(e => !e.is_dropped);
+  if (entries.length === 0) return;
+
+  // Sort by selected metric
+  const sorted = [...entries].sort((a, b) => {
+    if (cmpMetric === 'composite') {
+      const ca = (a.likes||0) + (a.collects||0)*2 + (a.comments||0)*3;
+      const cb = (b.likes||0) + (b.collects||0)*2 + (b.comments||0)*3;
+      return cb - ca;
+    }
+    return (b[cmpMetric]||0) - (a[cmpMetric]||0);
+  });
+
+  // Top 20 for readability
+  const top = sorted.slice(0, 20).reverse(); // Chart.js draws bottom-up
+
+  const labels = top.map(e => e.title.length > 18 ? e.title.slice(0,16)+'…' : e.title);
+  const values = top.map(e => {
+    if (cmpMetric === 'composite') return (e.likes||0) + (e.collects||0)*2 + (e.comments||0)*3;
+    return e[cmpMetric]||0;
+  });
+
+  const metricColors = { likes: '#f78166', collects: '#d2a854', comments: '#58a6ff', composite: '#7ee787' };
+  const metricNames = { likes: '点赞', collects: '收藏', comments: '评论', composite: '综合分' };
+
+  if (cmpChart) cmpChart.destroy();
+
+  const ctx = document.getElementById('compareChart').getContext('2d');
+  cmpChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: `${kw} · ${date} · ${metricNames[cmpMetric]}`,
+        data: values,
+        backgroundColor: metricColors[cmpMetric] + '99',
+        borderColor: metricColors[cmpMetric],
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const idx = ctx.dataIndex;
+              const full = sorted[sorted.length - 1 - idx];
+              const val = ctx.raw >= 10000 ? (ctx.raw/10000).toFixed(1)+'万' : ctx.raw.toLocaleString();
+              return `${full.title}: ${val} ${metricNames[cmpMetric]}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#8b949e',
+            callback: v => v >= 10000 ? (v/10000).toFixed(1)+'万' : v >= 1000 ? (v/1000).toFixed(1)+'k' : v
+          },
+          grid: { color: '#21262d' }
+        },
+        y: {
+          ticks: {
+            color: '#8b949e',
+            font: { size: 11 },
+            callback: (_, i) => `#${sorted.length - i}`
+          },
+          grid: { display: false }
+        }
+      }
+    }
+  });
 }
 
 // ===== UTILS =====
