@@ -1131,7 +1131,7 @@ function setCmpView(view) {
 }
 
 function renderCompare() {
-  if (!DATA || currentTab !== 'compare') return;
+  if (!getActiveData() || currentTab !== 'compare') return;
   if (cmpView === 'bar') return renderCompareBar();
   return renderCompareTrend();
 }
