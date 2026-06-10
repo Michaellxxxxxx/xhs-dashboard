@@ -26,6 +26,84 @@ body {
 }
 .header h1 { font-size: 18px; font-weight: 600; color: #f78166; }
 .header .update-time { font-size: 12px; color: #8b949e; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+
+/* Lock button */
+.lock-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.lock-btn:hover { border-color: #8b949e; color: #e1e4e8; }
+.lock-btn.unlocked { border-color: #3fb950; color: #3fb950; background: #1a2e1f; }
+
+/* Data source indicator */
+.data-source-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.data-source-badge.public { background: #1f3a5f; color: #58a6ff; }
+.data-source-badge.private { background: #3d1f1f; color: #f85149; display: none; }
+
+/* Password modal overlay */
+.modal-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 280px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.modal-box h3 { font-size: 16px; margin-bottom: 16px; color: #e1e4e8; }
+.modal-box input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  color: #e1e4e8;
+  font-size: 16px;
+  outline: none;
+  margin-bottom: 12px;
+}
+.modal-box input:focus { border-color: #f78166; }
+.modal-box .modal-error { color: #f85149; font-size: 13px; margin-bottom: 8px; display: none; }
+.modal-box .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-box button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #e1e4e8;
+  transition: all 0.15s;
+}
+.modal-box button.primary { background: #f78166; border-color: #f78166; color: #0d1117; font-weight: 600; }
+.modal-box button.primary:hover { background: #d96a4e; }
 
 /* Tabs */
 .tabs {
@@ -274,7 +352,11 @@ tr.dropped:hover { opacity: 0.7; }
 
 <div class="header">
   <h1>📊 小红书数据看板</h1>
-  <span class="update-time" id="updateTime">加载中...</span>
+  <div class="header-right">
+    <span class="data-source-badge public" id="sourceBadge" onclick="toggleDataSource()">📂 公开数据</span>
+    <button class="lock-btn" id="lockBtn" onclick="openPasswordModal()" title="查看私密数据">🔒</button>
+    <span class="update-time" id="updateTime">加载中...</span>
+  </div>
 </div>
 
 <div class="tabs">
@@ -435,9 +517,26 @@ tr.dropped:hover { opacity: 0.7; }
 }
 </style>
 
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal-box">
+    <h3>🔐 输入密码查看私密数据</h3>
+    <input type="password" id="passwordInput" placeholder="输入密码..." onkeydown="if(event.key==='Enter')verifyPassword()">
+    <div class="modal-error" id="modalError">密码错误，请重试</div>
+    <div class="modal-btns">
+      <button onclick="closePasswordModal()">取消</button>
+      <button class="primary" onclick="verifyPassword()">确认</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== STATE =====
 let DATA = null;
+let PRIVATE_DATA = null;
+let dataSource = 'public'; // 'public' | 'private'
+let unlocked = false;
+const LOCK_PASSWORD = '79854613';
 let selectedTrendPost = null;
 let trendChart = null;
 let cmpChart = null;
@@ -446,6 +545,8 @@ let cmpMetric = 'likes';
 let cmpView = 'trend';
 
 // ===== LOAD =====
+function getActiveData() { return dataSource === 'private' && PRIVATE_DATA ? PRIVATE_DATA : DATA; }
+
 fetch('data.json')
   .then(r => r.json())
   .then(d => {
@@ -459,14 +560,27 @@ fetch('data.json')
 
 function init() {
   document.getElementById('updateTime').textContent =
-    '更新于 ' + formatTime(DATA.updated_at);
+    '更新于 ' + formatTime(getActiveData().updated_at);
 
   // Populate keyword selectors
+  renderAllSelectors();
+
+  renderRanking();
+  renderTrendPosts();
+  setCmpView('trend');
+}
+
+function renderAllSelectors() {
+  const active = getActiveData();
   const kwSelect = document.getElementById('kwSelect');
   const trendKwSelect = document.getElementById('trendKwSelect');
   const cmpKwSelect = document.getElementById('cmpKwSelect');
 
-  DATA.keywords.forEach(kw => {
+  kwSelect.innerHTML = '';
+  trendKwSelect.innerHTML = '';
+  cmpKwSelect.innerHTML = '';
+
+  active.keywords.forEach(kw => {
     kwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
     trendKwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
     cmpKwSelect.innerHTML += `<option value="${kw}">${kw}</option>`;
@@ -475,14 +589,12 @@ function init() {
   // Populate date selector (reversed - newest first)
   const dateSelect = document.getElementById('dateSelect');
   const cmpDateSelect = document.getElementById('cmpDateSelect');
-  [...DATA.dates].reverse().forEach(d => {
+  dateSelect.innerHTML = '';
+  cmpDateSelect.innerHTML = '';
+  [...active.dates].reverse().forEach(d => {
     dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
     cmpDateSelect.innerHTML += `<option value="${d}">${d}</option>`;
   });
-
-  renderRanking();
-  renderTrendPosts();
-  setCmpView('trend'); // init compare tab visibility
 }
 
 // ===== TAB SWITCH =====
@@ -520,7 +632,8 @@ function setSort(sortBy) {
 }
 
 function renderRanking() {
-  if (!DATA) return;
+  const D = getActiveData();
+  if (!D) return;
 
   const kw = document.getElementById('kwSelect').value;
   const sortBy = currentSort;
@@ -528,7 +641,7 @@ function renderRanking() {
 
   if (!kw || !date) return;
 
-  const rankData = DATA.rankings[kw]?.[date] || [];
+  const rankData = D.rankings[kw]?.[date] || [];
 
   // Sort by selected metric
   const sorted = [...rankData].filter(e => !e.is_dropped);
@@ -656,7 +769,8 @@ function setTrendSort(sortBy) {
 }
 
 function renderTrendPosts() {
-  if (!DATA) return;
+  const D = getActiveData();
+  if (!D) return;
 
   const kw = document.getElementById('trendKwSelect').value;
   const search = (document.getElementById('trendSearch').value || '').toLowerCase();
@@ -664,7 +778,7 @@ function renderTrendPosts() {
 
   // Get all posts for this keyword
   const posts = [];
-  for (const [noteId, trend] of Object.entries(DATA.trends)) {
+  for (const [noteId, trend] of Object.entries(D.trends)) {
     if (kw && trend.keyword !== kw) continue;
     if (search) {
       if (!trend.title.toLowerCase().includes(search) &&
@@ -690,12 +804,12 @@ function renderTrendPosts() {
   posts.forEach((p, i) => { todayRank[p.note_id] = i + 1; });
 
   // Build yesterday's rank map (using same sort metric)
-  const dates = DATA.dates || [];
+  const dates = D.dates || [];
   const yesterdayRank = {};
   if (dates.length >= 2) {
     const yesterdayDate = dates[dates.length - 2];
     const prevPosts = [];
-    for (const [noteId, trend] of Object.entries(DATA.trends)) {
+    for (const [noteId, trend] of Object.entries(D.trends)) {
       if (kw && trend.keyword !== kw) continue;
       // Only include posts that have data on yesterday
       const hasYesterdayData = trend.data.some(d => d.date === yesterdayDate);
@@ -717,9 +831,9 @@ function renderTrendPosts() {
 
   // Build set of note_ids currently in ranking (latest date) per keyword
   const inRanking = new Set();
-  if (DATA.dates.length) {
-    const latestDate = DATA.dates[DATA.dates.length - 1];
-    for (const [rkw, dates_] of Object.entries(DATA.rankings || {})) {
+  if (D.dates.length) {
+    const latestDate = D.dates[D.dates.length - 1];
+    for (const [rkw, dates_] of Object.entries(D.rankings || {})) {
       if (kw && rkw !== kw) continue;
       const dayData = dates_[latestDate];
       if (dayData) {
@@ -815,6 +929,7 @@ function showTrendFromRanking(noteId, title, kw) {
 }
 
 function showTrend(noteId, title) {
+  const D = getActiveData();
   selectedTrendPost = noteId;
   switchTab('trends');
   renderTrendPosts();
@@ -825,7 +940,7 @@ function showTrend(noteId, title) {
     selectedEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  const trend = DATA.trends[noteId];
+  const trend = D.trends[noteId];
   if (!trend) return;
 
   const panel = document.getElementById('trendPanel');
@@ -1022,12 +1137,13 @@ function renderCompare() {
 }
 
 function renderCompareTrend() {
+  const D = getActiveData();
   const kw = document.getElementById('cmpKwSelect').value;
   if (!kw) return;
 
   // Collect all posts for this keyword from trends
   const posts = [];
-  for (const [nid, trend] of Object.entries(DATA.trends)) {
+  for (const [nid, trend] of Object.entries(D.trends)) {
     if (trend.keyword !== kw) continue;
     if (trend.data.length < 2) continue; // need 2+ data points for a line
     posts.push({ note_id: nid, ...trend });
@@ -1104,13 +1220,14 @@ function renderCompareTrend() {
 }
 
 function renderCompareBar() {
-  if (!DATA || currentTab !== 'compare') return;
+  const D = getActiveData();
+  if (!D || currentTab !== 'compare') return;
 
   const kw = document.getElementById('cmpKwSelect').value;
   const date = document.getElementById('cmpDateSelect').value;
   if (!kw || !date) return;
 
-  const rankings = DATA.rankings;
+  const rankings = D.rankings;
   if (!rankings[kw] || !rankings[kw][date]) return;
 
   const entries = rankings[kw][date].filter(e => !e.is_dropped);
@@ -1170,6 +1287,93 @@ function renderCompareBar() {
       }
     }
   });
+}
+
+// ===== PASSWORD MODAL =====
+function openPasswordModal() {
+  if (unlocked) {
+    toggleDataSource();
+    return;
+  }
+  document.getElementById('passwordModal').classList.add('show');
+  document.getElementById('passwordInput').value = '';
+  document.getElementById('modalError').style.display = 'none';
+  setTimeout(() => document.getElementById('passwordInput').focus(), 100);
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.remove('show');
+}
+
+function verifyPassword() {
+  const input = document.getElementById('passwordInput').value;
+  if (input === LOCK_PASSWORD) {
+    unlocked = true;
+    document.getElementById('lockBtn').classList.add('unlocked');
+    document.getElementById('lockBtn').textContent = '🔓';
+    document.getElementById('lockBtn').title = '切换数据源';
+    document.getElementById('modalError').style.display = 'none';
+    closePasswordModal();
+
+    // Load private data if not already loaded
+    if (!PRIVATE_DATA) {
+      fetch('private.json')
+        .then(r => r.json())
+        .then(d => {
+          PRIVATE_DATA = d;
+          switchToPrivate();
+        })
+        .catch(e => {
+          console.error('Failed to load private.json:', e);
+          alert('私密数据加载失败');
+          unlocked = false;
+          document.getElementById('lockBtn').classList.remove('unlocked');
+          document.getElementById('lockBtn').textContent = '🔒';
+        });
+    } else {
+      switchToPrivate();
+    }
+  } else {
+    document.getElementById('modalError').style.display = 'block';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('passwordInput').focus();
+  }
+}
+
+function switchToPrivate() {
+  dataSource = dataSource === 'public' ? 'private' : 'public';
+  updateSourceUI();
+  if (getActiveData()) {
+    renderAllSelectors();
+    renderRanking();
+    renderTrendPosts();
+    if (currentTab === 'trends') renderTrendPosts();
+    if (currentTab === 'compare') renderCompare();
+  }
+}
+
+function toggleDataSource() {
+  if (!unlocked) return openPasswordModal();
+  dataSource = dataSource === 'public' ? 'private' : 'public';
+  updateSourceUI();
+  renderAllSelectors();
+  renderRanking();
+  renderTrendPosts();
+  if (currentTab === 'compare') renderCompare();
+}
+
+function updateSourceUI() {
+  const badge = document.getElementById('sourceBadge');
+  if (dataSource === 'private') {
+    badge.textContent = '🔒 私密数据';
+    badge.className = 'data-source-badge private';
+    badge.style.display = 'inline-block';
+  } else {
+    badge.textContent = '📂 公开数据';
+    badge.className = 'data-source-badge public';
+    badge.style.display = 'inline-block';
+  }
+  document.getElementById('updateTime').textContent = '更新于 ' + formatTime(getActiveData().updated_at);
 }
 
 // ===== UTILS =====
